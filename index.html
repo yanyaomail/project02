@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>篮球均衡分队工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+        body {
+            background: #f5f7fa;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 2px 8px #ddd;
+            margin-bottom: 16px;
+        }
+        h3 {
+            margin-bottom: 12px;
+            color: #222;
+            border-left: 4px solid #2563eb;
+            padding-left: 8px;
+        }
+        .row {
+            margin: 10px 0;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        input, select, button {
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        button {
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+            border: none;
+        }
+        button.danger {
+            background: #dc2626;
+        }
+        button.success {
+            background: #16a34a;
+        }
+        .player-list {
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 8px;
+            margin: 10px 0;
+        }
+        .db-group-title {
+            font-weight: bold;
+            margin: 6px 0 4px;
+            color: #333;
+        }
+        .player-item {
+            display: flex;
+            align-items: center;
+            gap:6px;
+            padding: 4px 6px;
+            margin: 3px 0;
+            background: #f9fafb;
+            border-radius: 4px;
+        }
+        .team-wrap {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .team-card {
+            padding: 12px;
+            border-radius: 8px;
+        }
+        .team-a {
+            background: #dbeafe;
+            border: 2px solid #2563eb;
+        }
+        .team-b {
+            background: #fee2e2;
+            border: 2px solid #dc2626;
+        }
+        .tag {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 12px;
+            margin-left: 6px;
+        }
+        .tag-g { background: #bbf7d0; color: #15803d; }
+        .tag-f { background: #fef08a; color: #854d0e; }
+        .tag-c { background: #ddd6fe; color: #6d28d9; }
+        .split-rule {
+            background: #fffbeb;
+            padding: 8px;
+            border-radius: 6px;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <h2 style="margin-bottom:20px;color:#1e3a8a;">篮球自动均衡分队工具</h2>
+    <div class="container">
+        <!-- 左侧区域 -->
+        <div>
+            <!-- 内置球员库，勾选当日上场 -->
+            <div class="panel">
+                <h3>球员数据库（勾选今日上场人员）</h3>
+                <div class="player-list" id="dbList"></div>
+                <div class="row">
+                    <button onclick="checkAllDb()">全选库内球员</button>
+                    <button onclick="unCheckAllDb()">清空勾选</button>
+                </div>
+            </div>
+
+            <!-- 临时新增场外人员 -->
+            <div class="panel">
+                <h3>临时新增参赛人员（不在数据库）</h3>
+                <div class="row">
+                    <input id="tempName" placeholder="临时选手姓名">
+                    <select id="tempPos">
+                        <option value="后卫">后卫</option>
+                        <option value="前锋">前锋</option>
+                        <option value="中锋">中锋</option>
+                    </select>
+                    <button onclick="addTempPlayer()" class="success">加入参赛</button>
+                </div>
+                <div class="player-list" id="tempList"></div>
+                <button onclick="clearTemp()" class="danger" style="width:100%;margin-top:8px;">清空所有临时人员</button>
+            </div>
+
+            <!-- 强制隔离设置 -->
+            <div class="panel">
+                <h3>强制隔离（两人不能同队，可选择所有今日参赛选手）</h3>
+                <div class="row">
+                    <select id="splitP1"></select>
+                    <span>≠</span>
+                    <select id="splitP2"></select>
+                    <button onclick="addSplitRule()">添加隔离</button>
+                </div>
+                <div id="splitRulesBox"></div>
+            </div>
+        </div>
+
+        <!-- 右侧分队结果区域 -->
+        <div>
+            <div class="panel">
+                <div class="row">
+                    <button onclick="generateTeam()" class="success" style="font-size:16px;padding:10px 20px;">一键均衡分队</button>
+                    <button onclick="resetResult()">清空本次分组结果</button>
+                </div>
+                <h4 style="margin:12px 0;">今日全部参赛人员</h4>
+                <div class="player-list" id="allPlayerBox"></div>
+
+                <div class="team-wrap">
+                    <div class="team-card team-a">
+                        <h3>蓝队（A队）</h3>
+                        <div id="teamA"></div>
+                        <div id="statA" style="margin-top:10px;font-size:14px;"></div>
+                    </div>
+                    <div class="team-card team-b">
+                        <h3>红队（B队）</h3>
+                        <div id="teamB"></div>
+                        <div id="statB" style="margin-top:10px;font-size:14px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 固定内置球员数据库
+        const dbPlayers = [
+            // 中锋
+            {name:"Yehao",pos:"中锋"},
+            {name:"Regan",pos:"中锋"},
+            {name:"Sunyang",pos:"中锋"},
+            {name:"kunqiao",pos:"中锋"},
+            {name:"Albert",pos:"中锋"},
+            {name:"平凡之路",pos:"中锋"},
+	    {name:"Bert",pos:"中锋"},
+            {name:"Dino",pos:"中锋"},
+            // 前锋
+            {name:"Xiaobo",pos:"前锋"},
+            {name:"Nick",pos:"前锋"},
+            {name:"Luning",pos:"前锋"},
+            {name:"Zhouqi",pos:"前锋"},
+            {name:"小海",pos:"前锋"},
+            {name:"Zach",pos:"前锋"},
+            {name:"Qiugang",pos:"前锋"},
+            {name:"Russell",pos:"前锋"},
+            // 后卫
+            {name:"Liurui",pos:"后卫"},
+            {name:"Allen",pos:"后卫"},
+            {name:"Zhengbao",pos:"后卫"},
+            {name:"Shenjiang",pos:"后卫"},
+            {name:"Jackie",pos:"后卫"},
+            {name:"Colin",pos:"后卫"},
+        ];
+
+        let tempPlayers = [];
+        let splitRules = [];
+
+        window.onload = function(){
+            renderDB();
+            refreshAllSelect();
+        }
+
+        // 渲染数据库球员，分位置分组+勾选框
+        function renderDB(){
+            let box = document.getElementById("dbList");
+            box.innerHTML = "";
+            const posGroup = {
+                "中锋": dbPlayers.filter(p=>p.pos==="中锋"),
+                "前锋": dbPlayers.filter(p=>p.pos==="前锋"),
+                "后卫": dbPlayers.filter(p=>p.pos==="后卫"),
+            }
+            for(let pos in posGroup){
+                box.innerHTML += `<div class="db-group-title">${pos}</div>`;
+                posGroup[pos].forEach(item=>{
+                    let div = document.createElement("div");
+                    div.className = "player-item";
+                    div.innerHTML = `
+                        <input type="checkbox" class="db-check" data-name="${item.name}" data-pos="${item.pos}">
+                        <span>${item.name}<span class="tag tag-${item.pos[0]}">${item.pos}</span></span>
+                    `;
+                    box.appendChild(div);
+                })
+            }
+        }
+
+        function checkAllDb(){
+            document.querySelectorAll(".db-check").forEach(cb=>cb.checked = true);
+            refreshAllSelect();
+        }
+        function unCheckAllDb(){
+            document.querySelectorAll(".db-check").forEach(cb=>cb.checked = false);
+            refreshAllSelect();
+        }
+
+        function getCheckedDBPlayers(){
+            let res = [];
+            document.querySelectorAll(".db-check:checked").forEach(cb=>{
+                res.push({
+                    name: cb.dataset.name,
+                    pos: cb.dataset.pos
+                })
+            })
+            return res;
+        }
+
+        // 临时人员操作
+        function addTempPlayer(){
+            let n = document.getElementById("tempName").value.trim();
+            let p = document.getElementById("tempPos").value;
+            if(!n) return alert("请输入临时选手姓名");
+            tempPlayers.push({name:n,pos:p});
+            document.getElementById("tempName").value = "";
+            renderTemp();
+            refreshAllSelect();
+        }
+        function renderTemp(){
+            let box = document.getElementById("tempList");
+            box.innerHTML = "";
+            tempPlayers.forEach((item,idx)=>{
+                let div = document.createElement("div");
+                div.className = "player-item";
+                div.innerHTML = `
+                    <span>${item.name}<span class="tag tag-${item.pos[0]}">${item.pos}</span></span>
+                    <button onclick="delTemp(${idx})" style="padding:2px 6px;font-size:12px;">删</button>
+                `;
+                box.appendChild(div);
+            })
+        }
+        function delTemp(idx){
+            tempPlayers.splice(idx,1);
+            renderTemp();
+            refreshAllSelect();
+        }
+        function clearTemp(){
+            tempPlayers = [];
+            renderTemp();
+            refreshAllSelect();
+        }
+
+        // 获取所有参赛人员 = 勾选库内球员 + 临时人员
+        function getAllPlayers(){
+            const checkedDb = getCheckedDBPlayers();
+            return [...checkedDb, ...tempPlayers];
+        }
+
+        // 修复：下拉框展示【全部当日参赛人员】（勾选库内球员+临时选手）
+        function refreshAllSelect(){
+            let allPlayers = getAllPlayers();
+            let s1 = document.getElementById("splitP1");
+            let s2 = document.getElementById("splitP2");
+            s1.innerHTML = "";
+            s2.innerHTML = "";
+            allPlayers.forEach(p=>{
+                s1.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+                s2.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+            })
+            renderSplitRules();
+        }
+
+        // 隔离规则
+        function addSplitRule(){
+            let p1 = document.getElementById("splitP1").value;
+            let p2 = document.getElementById("splitP2").value;
+            if(p1 === p2) return alert("不能选择同一个人");
+            let exist = splitRules.some(r=>
+                (r.p1===p1&&r.p2===p2)||(r.p1===p2&&r.p2===p1)
+            );
+            if(exist) return alert("该隔离规则已存在");
+            splitRules.push({p1,p2});
+            renderSplitRules();
+        }
+        function renderSplitRules(){
+            let box = document.getElementById("splitRulesBox");
+            box.innerHTML = "";
+            splitRules.forEach((r,idx)=>{
+                let div = document.createElement("div");
+                div.className = "split-rule";
+                div.innerHTML = `${r.p1} 与 ${r.p2} 强制分开 
+                <button onclick="delRule(${idx})" style="margin-left:8px;padding:2px 6px;font-size:12px;">移除</button>`;
+                box.appendChild(div);
+            })
+        }
+        function delRule(idx){
+            splitRules.splice(idx,1);
+            renderSplitRules();
+        }
+
+        // 均衡分队核心算法：迭代200次选出最优均衡分组
+        function generateTeam(){
+            let all = getAllPlayers();
+            if(all.length <2) return alert("参赛人数至少2人，请勾选球员或添加临时选手");
+            let bestTeamA = [], bestTeamB = [];
+            let minScore = Infinity;
+
+            for(let loop=0; loop<200; loop++){
+                let shuffled = [...all].sort(()=>Math.random()-0.5);
+                let teamA = [], teamB = [];
+                const posSort = ["中锋","前锋","后卫"];
+                shuffled.sort((a,b)=> posSort.indexOf(a.pos)-posSort.indexOf(b.pos));
+                shuffled.forEach(player=>{
+                    let aC = teamA.filter(x=>x.pos===player.pos).length;
+                    let bC = teamB.filter(x=>x.pos===player.pos).length;
+                    if(aC <= bC) teamA.push(player);
+                    else teamB.push(player);
+                })
+
+                // 强制隔离校验调整
+                let needRecheck = true;
+                let cnt=0;
+                while(needRecheck && cnt<80){
+                    needRecheck = false;
+                    for(let rule of splitRules){
+                        let aInA = teamA.some(x=>x.name===rule.p1);
+                        let bInA = teamA.some(x=>x.name===rule.p2);
+                        if(aInA && bInA){
+                            let idx1 = teamA.findIndex(x=>x.name===rule.p1);
+                            let swapIdx = Math.floor(Math.random()*teamB.length);
+                            let temp = teamA[idx1];
+                            teamA[idx1] = teamB[swapIdx];
+                            teamB[swapIdx] = temp;
+                            needRecheck = true;
+                        }
+                        let aInB = teamB.some(x=>x.name===rule.p1);
+                        let bInB = teamB.some(x=>x.name===rule.p2);
+                        if(aInB && bInB){
+                            let idx1 = teamB.findIndex(x=>x.name===rule.p1);
+                            let swapIdx = Math.floor(Math.random()*teamA.length);
+                            let temp = teamB[idx1];
+                            teamB[idx1] = teamA[swapIdx];
+                            teamA[swapIdx] = temp;
+                            needRecheck = true;
+                        }
+                    }
+                    cnt++;
+                }
+
+                // 均衡评分：人数>中锋>前锋>后卫
+                function getCount(list){
+                    let g=0,f=0,c=0;
+                    list.forEach(p=>{
+                        if(p.pos=="后卫")g++;
+                        if(p.pos=="前锋")f++;
+                        if(p.pos=="中锋")c++;
+                    })
+                    return {g,f,c,total:list.length};
+                }
+                let statA = getCount(teamA);
+                let statB = getCount(teamB);
+                let score = Math.abs(statA.total - statB.total) * 10
+                    + Math.abs(statA.c - statB.c) * 5
+                    + Math.abs(statA.f - statB.f) * 3
+                    + Math.abs(statA.g - statB.g) * 1;
+
+                if(score < minScore){
+                    minScore = score;
+                    bestTeamA = [...teamA];
+                    bestTeamB = [...teamB];
+                }
+            }
+
+            // 渲染总参赛名单
+            let allBox = document.getElementById("allPlayerBox");
+            allBox.innerHTML = all.map(p=>`${p.name} <span class="tag tag-${p.pos[0]}">${p.pos}</span>`).join("、");
+
+            function renderTeam(boxId, list){
+                let box = document.getElementById(boxId);
+                box.innerHTML = list.map(p=>`<div>${p.name}<span class="tag tag-${p.pos[0]}">${p.pos}</span></div>`).join("");
+            }
+            renderTeam("teamA", bestTeamA);
+            renderTeam("teamB", bestTeamB);
+
+            function getStatText(list){
+                let g=0,f=0,c=0;
+                list.forEach(p=>{
+                    if(p.pos=="后卫")g++;
+                    if(p.pos=="前锋")f++;
+                    if(p.pos=="中锋")c++;
+                })
+                return `总${list.length}人｜后卫${g} 前锋${f} 中锋${c}`;
+            }
+            document.getElementById("statA").innerText = getStatText(bestTeamA);
+            document.getElementById("statB").innerText = getStatText(bestTeamB);
+        }
+
+        // 仅清空分组结果
+        function resetResult(){
+            document.getElementById("teamA").innerHTML = "";
+            document.getElementById("teamB").innerHTML = "";
+            document.getElementById("allPlayerBox").innerHTML = "";
+            document.getElementById("statA").innerText = "";
+            document.getElementById("statB").innerText = "";
+        }
+    </script>
+</body>
+</html>
